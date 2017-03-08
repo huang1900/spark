@@ -47,7 +47,6 @@ object TypeCoercion {
   val typeCoercionRules =
     PropagateTypes ::
       InConversion ::
-      WidenSetOperationTypes ::
       PromoteStrings ::
       DecimalPrecision ::
       BooleanEquality ::
@@ -58,6 +57,7 @@ object TypeCoercion {
       PropagateTypes ::
       ImplicitTypeCasts ::
       DateTimeOperations ::
+      WidenSetOperationTypes ::
       Nil
 
   // See https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types.
