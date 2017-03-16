@@ -87,6 +87,13 @@ private[hive] class SparkSQLSessionManager(hiveServer: HiveServer2, sqlContext: 
 
   override def closeSession(sessionHandle: SessionHandle) {
     HiveThriftServer2.listener.onSessionClosed(sessionHandle.getSessionId.toString)
+    try{
+      getAncestorField[Log](this, 3, "LOG").info(
+        "close session : " + sessionHandle.getSessionId() + "." )
+      HiveThriftServer2.uiTab.get.KillSessionjob(sessionHandle.getSessionId().toString)
+    } catch {
+      case x: Exception => x.printStackTrace()
+    }
     super.closeSession(sessionHandle)
     sparkSqlOperationManager.sessionToActivePool.remove(sessionHandle)
     sparkSqlOperationManager.sessionToContexts.remove(sessionHandle)
