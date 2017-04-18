@@ -20,6 +20,7 @@ package org.apache.spark.sql.hive
 import java.io.IOException
 import java.lang.reflect.InvocationTargetException
 import java.util
+import java.util.Locale
 
 import scala.collection.mutable
 import scala.util.control.NonFatal
@@ -499,7 +500,7 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
     // We can't use `filterKeys` here, as the map returned by `filterKeys` is not serializable,
     // while `CatalogTable` should be serializable.
     val propsWithoutPath = table.storage.properties.filter {
-      case (k, v) => k.toLowerCase != "path"
+      case (k, v) => k.toLowerCase(Locale.ROOT) != "path"
     }
     table.storage.copy(properties = propsWithoutPath ++ newPath.map("path" -> _))
   }
@@ -525,8 +526,10 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
       if (stats.rowCount.isDefined) {
         statsProperties += STATISTICS_NUM_ROWS -> stats.rowCount.get.toString()
       }
+      val colNameTypeMap: Map[String, DataType] =
+        tableDefinition.schema.fields.map(f => (f.name, f.dataType)).toMap
       stats.colStats.foreach { case (colName, colStat) =>
-        colStat.toMap.foreach { case (k, v) =>
+        colStat.toMap(colName, colNameTypeMap(colName)).foreach { case (k, v) =>
           statsProperties += (columnStatKeyPropName(colName, k) -> v)
         }
       }
@@ -1060,7 +1063,7 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
     // Hive's metastore is case insensitive. However, Hive's createFunction does
     // not normalize the function name (unlike the getFunction part). So,
     // we are normalizing the function name.
-    val functionName = funcDefinition.identifier.funcName.toLowerCase
+    val functionName = funcDefinition.identifier.funcName.toLowerCase(Locale.ROOT)
     requireFunctionNotExists(db, functionName)
     val functionIdentifier = funcDefinition.identifier.copy(funcName = functionName)
     client.createFunction(db, funcDefinition.copy(identifier = functionIdentifier))
