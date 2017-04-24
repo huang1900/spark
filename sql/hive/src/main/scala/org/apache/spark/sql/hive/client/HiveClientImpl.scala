@@ -193,6 +193,8 @@ private[hive] class HiveClientImpl(
     } finally {
       Thread.currentThread().setContextClassLoader(original)
     }
+
+    ret.getHdfsEncryptionShim()
     ret
   }
 

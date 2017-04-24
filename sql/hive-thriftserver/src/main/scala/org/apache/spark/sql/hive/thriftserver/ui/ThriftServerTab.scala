@@ -34,10 +34,27 @@ private[thriftserver] class ThriftServerTab(sparkContext: SparkContext)
 
   val parent = getSparkUI(sparkContext)
   val listener = HiveThriftServer2.listener
-
+  val sc = parent.sc
+  val jobProgresslistener = parent.jobProgressListener
   attachPage(new ThriftServerPage(this))
   attachPage(new ThriftServerSessionPage(this))
   parent.attachTab(this)
+  def KillSessionjob(sid: String): Unit = {
+    val executionList = HiveThriftServer2.listener.getExecutionList
+      .filter(_.sessionId == sid)
+    executionList.foreach { info =>
+      info.jobId.foreach(id => {
+        if (jobProgresslistener.activeJobs.contains(Integer.parseInt(id))) {
+          sc.foreach(_.cancelJob(Integer.parseInt(id)))
+          // Do a quick pause here to give Spark time to kill the job so it shows up as
+          // killed after the refresh. Note that this will block the serving thread so the
+          // time should be limited in duration.
+          Thread.sleep(100)
+        }
+
+      })
+    }
+  }
 
   def detach() {
     getSparkUI(sparkContext).detachTab(this)
