@@ -147,25 +147,6 @@ private[state] class HDFSBackedStateStoreProvider(
       }
     }
 
-    /** Remove a single key. */
-    override def remove(key: UnsafeRow): Unit = {
-      verify(state == UPDATING, "Cannot remove after already committed or aborted")
-      if (mapToUpdate.containsKey(key)) {
-        val value = mapToUpdate.remove(key)
-        Option(allUpdates.get(key)) match {
-          case Some(ValueUpdated(_, _)) | None =>
-            // Value existed in previous version and maybe was updated, mark removed
-            allUpdates.put(key, ValueRemoved(key, value))
-          case Some(ValueAdded(_, _)) =>
-            // Value did not exist in previous version and was added, should not appear in updates
-            allUpdates.remove(key)
-          case Some(ValueRemoved(_, _)) =>
-          // Remove already in update map, no need to change
-        }
-        writeToDeltaFile(tempDeltaFileStream, ValueRemoved(key, value))
-      }
-    }
-
     /** Commit all the updates that have been made to the store, and return the new version. */
     override def commit(): Long = {
       verify(state == UPDATING, "Cannot commit after already committed or aborted")
@@ -283,7 +264,9 @@ private[state] class HDFSBackedStateStoreProvider(
       // semantically correct because Structured Streaming requires rerunning a batch should
       // generate the same output. (SPARK-19677)
       // scalastyle:on
-      if (!fs.exists(finalDeltaFile) && !fs.rename(tempDeltaFile, finalDeltaFile)) {
+      if (fs.exists(finalDeltaFile)) {
+        fs.delete(tempDeltaFile, true)
+      } else if (!fs.rename(tempDeltaFile, finalDeltaFile)) {
         throw new IOException(s"Failed to rename $tempDeltaFile to $finalDeltaFile")
       }
       loadedMaps.put(newVersion, map)

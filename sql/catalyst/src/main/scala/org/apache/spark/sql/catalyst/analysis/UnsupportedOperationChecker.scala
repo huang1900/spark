@@ -46,13 +46,8 @@ object UnsupportedOperationChecker {
         "Queries without streaming sources cannot be executed with writeStream.start()")(plan)
     }
 
-    /** Collect all the streaming aggregates in a sub plan */
-    def collectStreamingAggregates(subplan: LogicalPlan): Seq[Aggregate] = {
-      subplan.collect { case a: Aggregate if a.isStreaming => a }
-    }
-
     // Disallow multiple streaming aggregations
-    val aggregates = collectStreamingAggregates(plan)
+    val aggregates = plan.collect { case a@Aggregate(_, _, _) if a.isStreaming => a }
 
     if (aggregates.size > 1) {
       throwError(
@@ -108,9 +103,8 @@ object UnsupportedOperationChecker {
           }
           throwErrorIf(
             child.isStreaming && distinctAggExprs.nonEmpty,
-            "Distinct aggregations are not supported on streaming DataFrames/Datasets, unless " +
-              "it is on aggregated DataFrame/Dataset in Complete output mode. Consider using " +
-              "approximate distinct aggregation (e.g. approx_count_distinct() instead of count()).")
+            "Distinct aggregations are not supported on streaming DataFrames/Datasets. Consider " +
+              "using approx_count_distinct() instead.")
 
         case _: Command =>
           throwError("Commands like CreateTable*, AlterTable*, Show* are not supported with " +
@@ -118,10 +112,6 @@ object UnsupportedOperationChecker {
 
         case _: InsertIntoTable =>
           throwError("InsertIntoTable is not supported with streaming DataFrames/Datasets")
-
-        case m: MapGroupsWithState if collectStreamingAggregates(m).nonEmpty =>
-          throwError("(map/flatMap)GroupsWithState is not supported after aggregation on a " +
-            "streaming DataFrame/Dataset")
 
         case Join(left, right, joinType, _) =>
 
@@ -176,7 +166,7 @@ object UnsupportedOperationChecker {
           throwError("Limits are not supported on streaming DataFrames/Datasets")
 
         case Sort(_, _, _) if !containsCompleteData(subPlan) =>
-          throwError("Sorting is not supported on streaming DataFrames/Datasets, unless it is on" +
+          throwError("Sorting is not supported on streaming DataFrames/Datasets, unless it is on " +
             "aggregated DataFrame/Dataset in Complete output mode")
 
         case Sample(_, _, _, _, child) if child.isStreaming =>

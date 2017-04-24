@@ -225,38 +225,6 @@ public class JavaDatasetSuite implements Serializable {
 
     Assert.assertEquals(asSet("1a", "3foobar"), toSet(flatMapped.collectAsList()));
 
-    Dataset<String> mapped2 = grouped.mapGroupsWithState(
-      new MapGroupsWithStateFunction<Integer, String, Long, String>() {
-        @Override
-        public String call(Integer key, Iterator<String> values, KeyedState<Long> s) throws Exception {
-          StringBuilder sb = new StringBuilder(key.toString());
-          while (values.hasNext()) {
-            sb.append(values.next());
-          }
-          return sb.toString();
-        }
-        },
-        Encoders.LONG(),
-        Encoders.STRING());
-
-    Assert.assertEquals(asSet("1a", "3foobar"), toSet(mapped2.collectAsList()));
-
-    Dataset<String> flatMapped2 = grouped.flatMapGroupsWithState(
-      new FlatMapGroupsWithStateFunction<Integer, String, Long, String>() {
-        @Override
-        public Iterator<String> call(Integer key, Iterator<String> values, KeyedState<Long> s) {
-          StringBuilder sb = new StringBuilder(key.toString());
-          while (values.hasNext()) {
-            sb.append(values.next());
-          }
-          return Collections.singletonList(sb.toString()).iterator();
-        }
-      },
-      Encoders.LONG(),
-      Encoders.STRING());
-
-    Assert.assertEquals(asSet("1a", "3foobar"), toSet(flatMapped2.collectAsList()));
-
     Dataset<Tuple2<Integer, String>> reduced = grouped.reduceGroups(new ReduceFunction<String>() {
       @Override
       public String call(String v1, String v2) throws Exception {
@@ -1336,5 +1304,29 @@ public class JavaDatasetSuite implements Serializable {
     Dataset<NestedComplicatedJavaBean> ds =
       spark.createDataset(data, Encoders.bean(NestedComplicatedJavaBean.class));
     ds.collectAsList();
+  }
+
+  @Test(expected = RuntimeException.class)
+  public void testNullInTopLevelBean() {
+    NestedSmallBean bean = new NestedSmallBean();
+    // We cannot set null in top-level bean
+    spark.createDataset(Arrays.asList(bean, null), Encoders.bean(NestedSmallBean.class));
+  }
+
+  @Test
+  public void testSerializeNull() {
+    NestedSmallBean bean = new NestedSmallBean();
+    Encoder<NestedSmallBean> encoder = Encoders.bean(NestedSmallBean.class);
+    List<NestedSmallBean> beans = Arrays.asList(bean);
+    Dataset<NestedSmallBean> ds1 = spark.createDataset(beans, encoder);
+    Assert.assertEquals(beans, ds1.collectAsList());
+    Dataset<NestedSmallBean> ds2 =
+      ds1.map(new MapFunction<NestedSmallBean, NestedSmallBean>() {
+        @Override
+        public NestedSmallBean call(NestedSmallBean b) throws Exception {
+          return b;
+        }
+      }, encoder);
+    Assert.assertEquals(beans, ds2.collectAsList());
   }
 }

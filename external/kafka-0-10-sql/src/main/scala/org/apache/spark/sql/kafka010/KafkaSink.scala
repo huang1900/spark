@@ -15,24 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.spark.api.java.function;
+package org.apache.spark.sql.kafka010
 
-import java.io.Serializable;
-import java.util.Iterator;
+import java.{util => ju}
 
-import org.apache.spark.annotation.Experimental;
-import org.apache.spark.annotation.InterfaceStability;
-import org.apache.spark.sql.Encoder;
-import org.apache.spark.sql.KeyedState;
+import org.apache.spark.internal.Logging
+import org.apache.spark.sql.{DataFrame, SQLContext}
+import org.apache.spark.sql.execution.streaming.Sink
 
-/**
- * ::Experimental::
- * Base interface for a map function used in
- * {@link org.apache.spark.sql.KeyValueGroupedDataset#flatMapGroupsWithState(FlatMapGroupsWithStateFunction, Encoder, Encoder)}.
- * @since 2.1.1
- */
-@Experimental
-@InterfaceStability.Evolving
-public interface FlatMapGroupsWithStateFunction<K, V, S, R> extends Serializable {
-  Iterator<R> call(K key, Iterator<V> values, KeyedState<S> state) throws Exception;
+private[kafka010] class KafkaSink(
+    sqlContext: SQLContext,
+    executorKafkaParams: ju.Map[String, Object],
+    topic: Option[String]) extends Sink with Logging {
+  @volatile private var latestBatchId = -1L
+
+  override def toString(): String = "KafkaSink"
+
+  override def addBatch(batchId: Long, data: DataFrame): Unit = {
+    if (batchId <= latestBatchId) {
+      logInfo(s"Skipping already committed batch $batchId")
+    } else {
+      KafkaWriter.write(sqlContext.sparkSession,
+        data.queryExecution, executorKafkaParams, topic)
+      latestBatchId = batchId
+    }
+  }
 }

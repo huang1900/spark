@@ -8,7 +8,7 @@ title: Structured Streaming Programming Guide
 {:toc}
 
 # Overview
-Structured Streaming is a scalable and fault-tolerant stream processing engine built on the Spark SQL engine. You can express your streaming computation the same way you would express a batch computation on static data.The Spark SQL engine will take care of running it incrementally and continuously and updating the final result as streaming data continues to arrive. You can use the [Dataset/DataFrame API](sql-programming-guide.html) in Scala, Java or Python to express streaming aggregations, event-time windows, stream-to-batch joins, etc. The computation is executed on the same optimized Spark SQL engine. Finally, the system ensures end-to-end exactly-once fault-tolerance guarantees through checkpointing and Write Ahead Logs. In short, *Structured Streaming provides fast, scalable, fault-tolerant, end-to-end exactly-once stream processing without the user having to reason about streaming.*
+Structured Streaming is a scalable and fault-tolerant stream processing engine built on the Spark SQL engine. You can express your streaming computation the same way you would express a batch computation on static data. The Spark SQL engine will take care of running it incrementally and continuously and updating the final result as streaming data continues to arrive. You can use the [Dataset/DataFrame API](sql-programming-guide.html) in Scala, Java or Python to express streaming aggregations, event-time windows, stream-to-batch joins, etc. The computation is executed on the same optimized Spark SQL engine. Finally, the system ensures end-to-end exactly-once fault-tolerance guarantees through checkpointing and Write Ahead Logs. In short, *Structured Streaming provides fast, scalable, fault-tolerant, end-to-end exactly-once stream processing without the user having to reason about streaming.*
 
 **Structured Streaming is still ALPHA in Spark 2.1** and the APIs are still experimental. In this guide, we are going to walk you through the programming model and the APIs. First, let's start with a simple example - a streaming word count. 
 
@@ -368,7 +368,7 @@ A query on the input will generate the "Result Table". Every trigger interval (s
 
 ![Model](img/structured-streaming-model.png)
 
-The "Output" is defined as what gets written out to the external storage. The output can be defined in different modes 
+The "Output" is defined as what gets written out to the external storage. The output can be defined in a different mode:
 
   - *Complete Mode* - The entire updated Result Table will be written to the external storage. It is up to the storage connector to decide how to handle writing of the entire table. 
 
@@ -545,7 +545,7 @@ spark = SparkSession. ...
 
 # Read text from socket 
 socketDF = spark \
-    .readStream() \
+    .readStream \
     .format("socket") \
     .option("host", "localhost") \
     .option("port", 9999) \
@@ -558,7 +558,7 @@ socketDF.printSchema()
 # Read all the csv files written atomically in a directory
 userSchema = StructType().add("name", "string").add("age", "integer")
 csvDF = spark \
-    .readStream() \
+    .readStream \
     .option("sep", ";") \
     .schema(userSchema) \
     .csv("/path/to/directory")  # Equivalent to format("csv").load("/path/to/directory")
@@ -788,11 +788,11 @@ Dataset<Row> windowedCounts = words
 words = ...  # streaming DataFrame of schema { timestamp: Timestamp, word: String }
 
 # Group the data by window and word and compute the count of each group
-windowedCounts = words
-    .withWatermark("timestamp", "10 minutes")
+windowedCounts = words \
+    .withWatermark("timestamp", "10 minutes") \
     .groupBy(
         window(words.timestamp, "10 minutes", "5 minutes"),
-        words.word)
+        words.word) \
     .count()
 {% endhighlight %}
 
@@ -995,7 +995,7 @@ Here is the compatibility matrix.
         <br/><br/>
         Update mode uses watermark to drop old aggregation state.
         <br/><br/>
-        Complete mode does drop not old aggregation state since by definition this mode
+        Complete mode does not drop old aggregation state since by definition this mode
         preserves all data in the Result Table.
     </td>    
   </tr>
@@ -1217,13 +1217,13 @@ noAggDF = deviceDataDf.select("device").where("signal > 10")
 
 # Print new data to console
 noAggDF \
-    .writeStream() \
+    .writeStream \
     .format("console") \
     .start()
 
 # Write new data to Parquet files
 noAggDF \
-    .writeStream() \
+    .writeStream \
     .format("parquet") \
     .option("checkpointLocation", "path/to/checkpoint/dir") \
     .option("path", "path/to/destination/dir") \
@@ -1234,14 +1234,14 @@ aggDF = df.groupBy("device").count()
 
 # Print updated aggregations to console
 aggDF \
-    .writeStream() \
+    .writeStream \
     .outputMode("complete") \
     .format("console") \
     .start()
 
 # Have all the aggregates in an in memory table. The query name will be the table name
 aggDF \
-    .writeStream() \
+    .writeStream \
     .queryName("aggregates") \
     .outputMode("complete") \
     .format("memory") \
@@ -1329,7 +1329,7 @@ query.lastProgress();    // the most recent progress update of this streaming qu
 <div data-lang="python"  markdown="1">
 
 {% highlight python %}
-query = df.writeStream().format("console").start()   # get the query object
+query = df.writeStream.format("console").start()   # get the query object
 
 query.id()          # get the unique identifier of the running query that persists across restarts from checkpoint data
 
@@ -1674,7 +1674,7 @@ aggDF
 
 {% highlight python %}
 aggDF \
-    .writeStream() \
+    .writeStream \
     .outputMode("complete") \
     .option("checkpointLocation", "path/to/HDFS/dir") \
     .format("memory") \

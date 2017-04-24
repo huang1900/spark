@@ -322,6 +322,7 @@ class StreamExecution(
       initializationLatch.countDown()
 
       try {
+        stopSources()
         state.set(TERMINATED)
         currentStatus = status.copy(isTriggerActive = false, isDataAvailable = false)
 
@@ -347,6 +348,13 @@ class StreamExecution(
           }
         }
       } finally {
+        awaitBatchLock.lock()
+        try {
+          // Wake up any threads that are waiting for the stream to progress.
+          awaitBatchLockCondition.signalAll()
+        } finally {
+          awaitBatchLock.unlock()
+        }
         terminationLatch.countDown()
       }
     }
@@ -559,6 +567,18 @@ class StreamExecution(
     sparkSession.streams.postListenerEvent(event)
   }
 
+  /** Stops all streaming sources safely. */
+  private def stopSources(): Unit = {
+    uniqueSources.foreach { source =>
+      try {
+        source.stop()
+      } catch {
+        case NonFatal(e) =>
+          logWarning(s"Failed to stop streaming source: $source. Resources may have leaked.", e)
+      }
+    }
+  }
+
   /**
    * Signals to the thread executing micro-batches that it should stop running after the next
    * batch. This method blocks until the thread stops running.
@@ -571,7 +591,6 @@ class StreamExecution(
       microBatchThread.interrupt()
       microBatchThread.join()
     }
-    uniqueSources.foreach(_.stop())
     logInfo(s"Query $prettyIdString was stopped")
   }
 
