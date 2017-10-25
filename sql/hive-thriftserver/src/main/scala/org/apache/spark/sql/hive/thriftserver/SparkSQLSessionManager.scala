@@ -97,7 +97,7 @@ private[hive] class SparkSQLSessionManager(hiveServer: HiveServer2, sqlContext: 
     super.closeSession(sessionHandle)
     sparkSqlOperationManager.sessionToActivePool.remove(sessionHandle)
     val ctx = sparkSqlOperationManager.sessionToContexts.remove(sessionHandle)
-    if( ctx != null && ctx.sessionState != null ) {
+    if(!sqlContext.conf.hiveThriftServerSingleSession && ctx != null && ctx.sessionState != null ) {
       try {
         ctx.sparkSession.sqlContext.sessionState.catalog.externalCatalog.close()
       } catch {
