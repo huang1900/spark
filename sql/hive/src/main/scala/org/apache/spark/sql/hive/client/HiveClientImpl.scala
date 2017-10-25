@@ -780,6 +780,9 @@ private[hive] class HiveClientImpl(
         client.dropDatabase(db, true, false, true)
       }
   }
+  def close(): Unit = {
+    state.close()
+  }
 }
 
 private[hive] object HiveClientImpl {
