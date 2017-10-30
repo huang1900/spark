@@ -26,11 +26,11 @@ import org.apache.hive.service.cli.SessionHandle
 import org.apache.hive.service.cli.session.SessionManager
 import org.apache.hive.service.cli.thrift.TProtocolVersion
 import org.apache.hive.service.server.HiveServer2
-
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.hive.HiveUtils
+import org.apache.spark.sql.hive.{HiveSessionResourceLoader, HiveUtils}
 import org.apache.spark.sql.hive.thriftserver.ReflectionUtils._
 import org.apache.spark.sql.hive.thriftserver.server.SparkSQLOperationManager
+import org.apache.spark.sql.internal.BaseSessionStateBuilder
 
 
 private[hive] class SparkSQLSessionManager(hiveServer: HiveServer2, sqlContext: SQLContext)
@@ -59,16 +59,16 @@ private[hive] class SparkSQLSessionManager(hiveServer: HiveServer2, sqlContext: 
   }
 
   override def openSession(
-      protocol: TProtocolVersion,
-      username: String,
-      passwd: String,
-      ipAddress: String,
-      sessionConf: java.util.Map[String, String],
-      withImpersonation: Boolean,
-      delegationToken: String): SessionHandle = {
+                            protocol: TProtocolVersion,
+                            username: String,
+                            passwd: String,
+                            ipAddress: String,
+                            sessionConf: java.util.Map[String, String],
+                            withImpersonation: Boolean,
+                            delegationToken: String): SessionHandle = {
     val sessionHandle =
       super.openSession(protocol, username, passwd, ipAddress, sessionConf, withImpersonation,
-          delegationToken)
+        delegationToken)
     val session = super.getSession(sessionHandle)
     HiveThriftServer2.listener.onSessionCreated(
       session.getIpAddress, sessionHandle.getSessionId.toString, session.getUsername)
@@ -87,22 +87,23 @@ private[hive] class SparkSQLSessionManager(hiveServer: HiveServer2, sqlContext: 
 
   override def closeSession(sessionHandle: SessionHandle) {
     HiveThriftServer2.listener.onSessionClosed(sessionHandle.getSessionId.toString)
-    try{
+    try {
       getAncestorField[Log](this, 3, "LOG").info(
-        "close session : " + sessionHandle.getSessionId() + "." )
+        "close session : " + sessionHandle.getSessionId() + ".")
       HiveThriftServer2.uiTab.get.KillSessionjob(sessionHandle.getSessionId().toString)
     } catch {
       case x: Exception => x.printStackTrace()
     }
     super.closeSession(sessionHandle)
     sparkSqlOperationManager.sessionToActivePool.remove(sessionHandle)
-    val ctx = sparkSqlOperationManager.sessionToContexts.remove(sessionHandle)
-    if(!sqlContext.conf.hiveThriftServerSingleSession && ctx != null && ctx.sessionState != null ) {
-      try {
-        ctx.sparkSession.sqlContext.sessionState.catalog.externalCatalog.close()
-      } catch {
-        case x: Exception => x.printStackTrace()
+    try {
+      val ctx = sparkSqlOperationManager.sessionToContexts.remove(sessionHandle)
+      if (!sqlContext.conf.hiveThriftServerSingleSession && ctx != null && ctx.sparkSession.sqlContext.sessionState != null &&
+        ctx.sparkSession.sqlContext.sessionState.catalog.functionResourceLoader.isInstanceOf[HiveSessionResourceLoader]) {
+        ctx.sparkSession.sqlContext.sessionState.catalog.asInstanceOf[HiveSessionResourceLoader].close()
       }
+    } catch {
+      case x: Exception => x.printStackTrace()
     }
   }
 }

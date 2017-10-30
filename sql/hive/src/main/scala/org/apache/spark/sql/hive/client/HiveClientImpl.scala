@@ -781,8 +781,14 @@ private[hive] class HiveClientImpl(
       }
   }
   def close(): Unit = {
-    state.close()
-  }
+    try{
+      state.close()
+    } catch{
+      case ioe: Exception =>
+             ioe.printStackTrace()
+         }
+    }
+
 }
 
 private[hive] object HiveClientImpl {

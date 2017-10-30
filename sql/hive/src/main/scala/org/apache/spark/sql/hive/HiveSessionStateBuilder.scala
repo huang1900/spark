@@ -121,6 +121,9 @@ class HiveSessionResourceLoader(
     session: SparkSession,
     client: HiveClient)
   extends SessionResourceLoader(session) {
+  def close() : Unit = {
+    client.close()
+   }
   override def addJar(path: String): Unit = {
     client.addJar(path)
     super.addJar(path)

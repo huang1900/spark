@@ -59,7 +59,7 @@ class SessionCatalog(
     conf: SQLConf,
     hadoopConf: Configuration,
     parser: ParserInterface,
-    functionResourceLoader: FunctionResourceLoader) extends Logging {
+    val functionResourceLoader: FunctionResourceLoader) extends Logging {
   import SessionCatalog._
   import CatalogTypes.TablePartitionSpec
 
@@ -1272,7 +1272,6 @@ class SessionCatalog(
       functionRegistry.registerFunction(f, expressionInfo.get, functionBuilder.get)
     }
   }
-
   /**
    * Copy the current state of the catalog to another catalog.
    *
