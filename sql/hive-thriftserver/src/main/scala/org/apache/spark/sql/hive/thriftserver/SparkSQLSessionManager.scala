@@ -100,7 +100,7 @@ private[hive] class SparkSQLSessionManager(hiveServer: HiveServer2, sqlContext: 
       val ctx = sparkSqlOperationManager.sessionToContexts.remove(sessionHandle)
       if (!sqlContext.conf.hiveThriftServerSingleSession && ctx != null && ctx.sparkSession.sqlContext.sessionState != null &&
         ctx.sparkSession.sqlContext.sessionState.catalog.functionResourceLoader.isInstanceOf[HiveSessionResourceLoader]) {
-        ctx.sparkSession.sqlContext.sessionState.catalog.asInstanceOf[HiveSessionResourceLoader].close()
+        ctx.sparkSession.sqlContext.sessionState.catalog.functionResourceLoader.asInstanceOf[HiveSessionResourceLoader].close()
       }
     } catch {
       case x: Exception => x.printStackTrace()
